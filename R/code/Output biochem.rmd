@@ -1,0 +1,138 @@
+---
+title: "Lab Sprite murder mystery"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Round 1
+
+The first victim is `r Sprites[victims[1],1]` Sprite.
+
+#### HPLC experiment 1
+Percentage acetonitrile: `r phi1*100`.\
+The impostor sample showed the compounds `r Impostorclues$HPLC[1]` and `r Impostorclues$HPLC[2]`.
+
+
+```{r echo = FALSE}
+hp1
+```
+
+#### SDS-PAGE gel 1
+The impostor sample showed bands at `r Impostorclues$Gel[1]` kDa, `r Impostorclues$Gel[2]` kDa,
+and `r Impostorclues$Gel[3]` kDa.\
+The marker sizes are (highest to lowest): `r Markers` kDa.\
+`r knitr::include_graphics('output/Gel1.png')`
+
+#### Western blot 1 
+The impostor's western and MS results suggest that they have glycosylation group 
+`r Impostorclues$sugar[1]`. 
+
+`r knitr::include_graphics('output/West1.png')`
+
+#### MS experiment 1
+
+```{r echo = FALSE}
+mssus1 %>%
+  knitr::kable() %>%
+  kable_classic(full_width = F, html_font = "Calibri")
+```
+
+## Round 2
+
+The second victim is `r Sprites[victims[2],1]` Sprite.
+
+#### HPLC experiment 2
+Percentage acetonitrile: `r phi2*100`.\
+The impostor sample showed the compounds `r Impostorclues$HPLC[3]` and `r Impostorclues$HPLC[4]`.
+
+
+```{r echo = FALSE}
+hp2
+```
+
+#### SDS-PAGE gel 2
+The impostor sample showed bands at `r Impostorclues$Gel[4]` kDa, `r Impostorclues$Gel[5]` kDa,
+and `r Impostorclues$Gel[6]` kDa.\
+The marker sizes are (highest to lowest): `r Markers` kDa.\
+`r knitr::include_graphics('output/Gel2.png')`
+
+#### Western blot 2 
+The impostor's western and MS results suggest that they have glycosylation group 
+`r Impostorclues$sugar[2]`. 
+
+`r knitr::include_graphics('output/West2.png')`
+
+#### MS experiment 2
+
+```{r echo = FALSE}
+mssus2 %>%
+  knitr::kable() %>%
+  kable_classic(full_width = F, html_font = "Calibri")
+```
+## Round 3
+
+The third victim is `r Sprites[victims[3],1]` Sprite.
+
+#### HPLC experiment 3
+Percentage acetonitrile: `r phi3*100`.\
+The impostor sample showed the compounds `r Impostorclues$HPLC[5]` and `r Impostorclues$HPLC[6]`.
+
+
+```{r echo = FALSE}
+hp3
+```
+
+#### SDS-PAGE gel 3
+The impostor sample showed bands at `r Impostorclues$Gel[7]` kDa, `r Impostorclues$Gel[8]` kDa,
+and `r Impostorclues$Gel[9]` kDa.\
+The marker sizes are (highest to lowest): `r Markers` kDa.\
+`r knitr::include_graphics('output/Gel3.png')`
+
+#### Western blot 3 
+The impostor's western and MS results suggest that they have glycosylation group 
+`r Impostorclues$sugar[3]`. 
+
+`r knitr::include_graphics('output/West3.png')`
+
+#### MS experiment 3
+
+```{r echo = FALSE}
+mssus3 %>%
+  knitr::kable() %>%
+  kable_classic(full_width = F, html_font = "Calibri")
+```
+
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+
+## Impostor
+
+The impostor is `r Sprites$Names[Impostor]` Sprite.
+

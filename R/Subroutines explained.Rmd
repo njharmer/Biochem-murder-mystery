@@ -1,0 +1,411 @@
+---
+title: "Subroutines explained"
+author: "Nicholas Harmer"
+date: "2022-10-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+This document details the five subroutine scripts for the "Among Us" biochemistry murder mystery event. These are used with the core script.
+The five scripts are introduced in the order that they are called in the core script.
+
+### Murder
+The purpose of this script is to define a new victim.
+The "murder" function is defined. This takes three arguments; tot and imp should all be integers, whilst vic should be a list. tot is the total number of sprites; vic is the list of sprite numbers of victims (with undefined victims set to zero); imp is the sprite number of the impostor.
+The variable "unique" is used to set up a "while" loop. In this loop, a single number in the total number of sprites is chosen at random. This is checked against "imp" and the list of victims. If the random number is neither the impostor nor a victim, then unique is set to TRUE and the loop ends. If the random number is either the impostor or a victim, then the loop repeats.
+The new victim number is returned.
+
+```{r}
+# Function call for the BIO2090 "Among Us" event
+# Nicholas Harmer, 2021
+
+# Define function for victim killing; tot is the number of sprites,
+# vic is the list of victims; imp is the impostor no.
+murder <- function(tot, vic, imp){
+  unique <- FALSE
+  while (unique == FALSE) {
+    victim <- sample(1:tot,1)
+    if (victim != imp) {unique <- TRUE}
+    for (i in 1:length(vic)) {
+      if (victim == vic[i]) {unique <- FALSE}
+    }
+  }
+  output <- victim
+}
+
+```
+
+### Suspects
+
+The "suspects" function defines a list of suspects, in alphabetical order.
+The function takes three arguments: integers to give the number of suspects to generate (x), and the total number of possible suspects (tot); and a list of victims.
+The function sets the "unique" variable to FALSE to set a "while" loop. A set of x numbers in tot are randomly selected. These are checked against the list of victims in two nested for loops. If one of the random numbers is a victim, then "unique" is set to FALSE and the while loop repeats. This is a little inefficient but is faster than other steps in the code and so can be tolerated.
+If the random numbers do not coincide with a victim, then the list of random numbers is sorted into ascending order so that the suspects will be in alphabetical order. The list is returned.
+
+```{r }
+# Function call for the BIO2090 "Among Us" event
+# Nicholas Harmer, 2021
+
+# Define function to generate suspects
+# x is the number of suspects to generate, tot is the number of Sprites, vic is the list of victims.
+# returns a list of suspects
+suspects <- function(x,tot,vic) {
+  unique <- FALSE
+  while (unique == FALSE) {
+    unique <- TRUE
+    sus <- sample(1:tot,x)
+    for (i in 1:x) {
+      for (j in 1:length(vic)) {
+        if (sus[i] == vic[j]) {unique <- FALSE}
+      }
+    }
+  }
+  suspects <- sus[sort.list(sus)]
+}
+```
+
+### Gel or Gel-bio
+These two modules are used to produce a gel clue. The "Gel" script is easiest to understand. The script takes arguments of a list of marker proteins; a matrix of the suspect numbers with the molecular weights of their proteins; and the list of names of the sprites. This script could easily be recycled for different purposes.
+The script performs the following:
+- Sets up a "wells" variable of the number of samples plus one (for the markers).
+- Sets up a matrix of 110 columns and 10 times the number of wells. This will form the gel image. The columns are numbered from the bottom of the gel image (top of the gel is 110). All values are set to 0; in the final image, the intensity of colour will be scaled to the highest value in the matrix.
+- Uses a loop to set up well shapes in columns 102-110, six pixels wide, set to a value of 1.
+- Uses a loop to make bands for the markers. For each marker, the proportion of a hypothetical bromophenol blue band (which has just run off the gel in this embodiment) is calculated. This roughly reflects a 10% gel. The proportion is necessarily calculated to the nearest %. For each marker band, a band six pixels wide at the value calculated (subtracted from 100 as the bottom of the gel is 0) is set to 1: a rectangle of pixels around this is set to 0.5.
+- Uses two nested loops to do the same as for the marker proteins for each protein in each of the samples.
+
+The last few lines generate the image.
+- A "lab" variable is set to provide the labelling for the gel. The first well is set to the markers, the last to the imposter, and the sprite names to the remaining wells.
+- Uses the "image" command to generate the image. This uses the "Blues3" palette, but others from rcartocolor could be used.
+- Adds the labels to the plot.
+- writes the image to a variable to be returned.
+
+```{r}
+# Function call for the BIO2090 "Among Us" event
+# Nicholas Harmer, 2021, 2022
+
+# Define function to provide an SDS-PAGE gel clue; mark is the marker sizes; sus is a matrix of the suspects' protein sizes
+# The gel is giving separation in a range from 250 kDa to 3.2 kDa over a total of 100 pixels.
+# Gel equation used is log10(size in kDa) = 2.5 -(0.5*RBPB)
+# Returns a gel image.
+Gel <- function(mark,sus,names=""){
+  wells <- length(sus[,1])+1
+  gel <- matrix(rep(0,(1100*wells)), nrow=10*wells)
+  for (i in 1:wells) {
+    gel[(3+((i-1)*10)):(8+((i-1)*10)),102:110] <- 1
+  }
+  for (i in 1:length(mark)) {
+    DBPB <- 100-round(50*(2.5-(log10(mark[i]))))
+    gel[2:9,(DBPB-1):(DBPB+1)] <- 0.5; gel[3:8,DBPB] <- 1
+  }
+  for (i in (1:(wells-1))) {
+    for (j in 2:(length(sus[1,]))) {
+      DBPB <- 100-round(50*(2.5-log10(sus[i,j])))
+      gel[(2+(10*i)):(9+(10*i)),(DBPB-1):(DBPB+1)] <- 0.5; gel[(3+(10*i)):(8+(10*i)),DBPB] <- 1
+    }
+  }
+  
+  # Write out an image and return it as the output
+  lab <- rep("",wells) ; lab[1] <- "markers"; lab[wells] <- "Impostor"
+  for (i in 2:(wells-1)) { lab[i] <- names[sus[(i-1),1]]}
+  image(gel, axes=F, col = hcl.colors(n=10, palette = "Blues 3", rev = TRUE))
+  mtext(text=lab, side=1, line=0.3, at=seq((0.5/wells),(1-(0.5/wells)),(1/wells)), las=2, cex=1)
+  output <- recordPlot()
+}
+```
+
+The "Gel-bio" script is a refinement of this to command. The aim of the refinement is to make the gels more realistic so that biochemistry students see something more like what they might produce in the lab. Mostly this adds imperfections, although there is an element of making bands with more protein more prominent.
+The revised "Gel" command takes the same arguments as above.
+The key changes are:
+- The matrix that defines the image is ten times larger in each dimension. This gives a richer image but means that the calculations take longer.
+- A "smile" parameter is randomly set to make the gel "smile" a little. This smile is symmetrical in this script; more options could be added as an extension. The smile makes the edges run 2-10% slower than the centre, using a cosine function to generate a curve.
+- For each well, "load" and "width" parameters are set to add imperfection, using a normal distribution. Lanes may be loaded a little to one side; and the width of each well may be wider to mirror gel or loading imperfections. This means that some lanes may slightly overlap, still allowing interpretation but adding to the challenge. A check ensures that the lanes will not go outside the gel.
+- The bands now are defined with greater granularity. The thickest part of the band is three pixels wide, with the intensity dropping off at six levels outside this band. The calculation is set so that should two bands overlap, the intensity will be additive to a maximum.
+ This script does not show an impostor sample.
+```{r}
+# Function call for the BIO2090 "Among Us" event
+# Nicholas Harmer, 2021
+
+# Define function to provide an SDS-PAGE gel clue; mark is the marker sizes; sus is a matrix of the suspects' protein sizes
+# The gel is giving separation in a range from 250 kDa to 3.2 kDa over a total of 1000 pixels.
+# Gel equation used is log10(size in kDa) = 2.5 -(0.5*RBPB).
+# Band intensity reflects quantity (currently at two levels, could be increased).
+# A random amount of smiling is produced that will cause a change of up to 10% at the extremes.
+# Band loading is also dodgy in some places.
+# Returns a gel image.
+# Requires that the elliptic package has been called.
+
+Gel <- function(mark,sus,names=""){
+  wells <- length(sus[,1])+1
+  gel <- matrix(rep(0,(110000*wells)), nrow=100*wells)
+  smile <- sample(2:10,1)
+  for (i in 1:wells) {
+    gel[(30+((i-1)*100)):(80+((i-1)*100)),1020:1100] <- 1
+  }
+  load <- round(rnorm(1,11,5)); if (load < 1){load <- 1}
+  width <- round(rnorm(1,80,10))
+  for (i in 1:length(mark)) {
+    DBPB <- 1000-round(500*(2.5-(log10(mark[i]))))
+    for (j in load:(load+width-1)){
+      DBPBi <- DBPB + round(DBPB*((smile*(1-cos(((100*wells/2)-j)/(100*wells/2)))/100)))
+      for (k in (DBPBi-8):(DBPBi+8)){
+        gel[j,k] <- limit(gel[j,k] + 0.015*(limit(8-(abs(k-DBPBi)),upper=6))*
+                            (limit((width/2)-(abs(load+(width/2)-j)),10)),1)
+      }
+    }
+  }
+  for (i in (1:(wells-1))) {
+    load <- round(rnorm(1,(11+(100*i)),5))
+    width <- round(rnorm(1,80,10)); if (load+width-1 > 100*wells){load <- (100*wells)-width}
+    for (j in 2:(length(sus[1,]))) {
+      DBPB <- 1000-round(500*(2.5-log10(sus[i,j])))
+      for (k in load:(load+width-1)){
+        DBPBi <- DBPB + round(DBPB*((smile*(1-cos(((100*wells/2)-k)/(100*wells/2)))/100)))
+        for (l in (DBPBi-8):(DBPBi+8)){
+          gel[k,l] <- limit(gel[k,l] + 0.015*(limit(8-(abs(l-DBPBi)),upper=6))*
+                              (limit((width/2)-(abs(load+(width/2)-k)),10)),1)
+        }
+      }
+    }
+  }
+  
+  # Write out an image and return it as the output
+  lab <- rep("",wells) ; lab[1] <- "markers"
+  for (i in 2:(wells)) { lab[i] <- names[sus[(i-1),1]]}
+  image(gel, axes=F, col = hcl.colors(n=10, palette = "Blues 3", rev = TRUE))
+  mtext(text=lab, side=1, line=0.3, at=seq((0.5/wells),(1-(0.5/wells)),(1/wells)), las=2, cex=1)
+  output <- recordPlot()
+}
+```
+
+### Western or Western-bio
+Similarly to the gel clues, these two scripts give alternate commands that are either simpler for non-biochemist students or more challenging for biochemistry students.
+The scripts are based on the gel scripts. The arguments are a list of marker sizes; a matrix containing the sprite name and "glycosylation" group; and a value for the probe (either J or K, although this is not checked).
+The scripts set up a matrix for the image and shows the wells in the same manner as the gel.
+The scripts split into two depending on the probe value. This could perhaps be more efficient. 
+Each half selects two marker bands (different for the two probes) to be shown; and shows the largest protein if the "glycosylation" group contains the probe letter.
+Finally, an image is written out.
+For the biochemist script, the same amendments are made as for the gel script. Other changes might be suggested!
+
+```{r}
+# Function call for the BIO2090 "Among Us" event
+# Nicholas Harmer, 2021, 2022
+
+# Define function to provide a western blot clue; mark is the marker sizes; sus is a matrix of the suspects' protein sizes
+# probe is either "J" or "K".
+# The second and fifth markers will light up with probe J; the first and fourth markers will light up with probe K.
+# Only the largest suspect protein will light up (so no additional information is given about suspects).
+# The gel is giving separation in a range from 250 kDa to 3.2 kDa over a total of 100 pixels.
+# Gel equation used is log10(size in kDa) = 2.5 -(0.5*RBPB)
+West <- function(mark,wsus,probe){
+  wells <- length(wsus[,1])+1
+  wes <- matrix(rep(0,(1100*wells)), nrow=wells*10)
+  for (i in 1:wells) {
+    wes[(3+((i-1)*10)):(8+((i-1)*10)),102:110] <- 1
+  }
+  if(probe == "J"){
+    DBPB <- 100-round(50*(2.5-(log10(mark[2])))); wes[2:9,(DBPB-1):(DBPB+1)] <- 0.5; wes[3:8,DBPB] <- 1
+    DBPB <- 100-round(50*(2.5-(log10(mark[5])))); wes[2:9,(DBPB-1):(DBPB+1)] <- 0.5; wes[3:8,DBPB] <- 1
+    DBPB <- 100-round(50*(2.5-(log10(Prots[1]))))
+    for (i in 1:(wells-1)) {
+      if(substr(wsus[i,2],1,1) == "J") {
+        wes[(2+(10*i)):(9+(10*i)),(DBPB-1):(DBPB+1)] <- 0.5; wes[(3+(10*i)):(8+(10*i)),DBPB] <- 1
+      }
+    }
+  }
+  
+  if(probe == "K"){
+    DBPB <- 100-round(50*(2.5-(log10(mark[1])))); wes[2:9,(DBPB-1):(DBPB+1)] <- 0.5; wes[3:8,DBPB] <- 1
+    DBPB <- 100-round(50*(2.5-(log10(mark[4])))); wes[2:9,(DBPB-1):(DBPB+1)] <- 0.5; wes[3:8,DBPB] <- 1
+    DBPB <- 100-round(50*(2.5-(log10(Prots[1]))))
+    for (i in 1:(wells-1)) {
+      if(substr(wsus[i,2],nchar(wsus[i,2]),nchar(wsus[i,2])) == "K") {
+        wes[(2+(10*i)):(9+(10*i)),(DBPB-1):(DBPB+1)] <- 0.5; wes[(3+(10*i)):(8+(10*i)),DBPB] <- 1
+      }
+    }
+  }
+  # Write out an image and return it as the output
+  lab <- rep("",wells) ; lab[1] <- "markers"; lab[wells] <- "Impostor"
+  for (i in 2:(wells-1)) { lab[i] <- wsus[(i-1),1]}
+  image(wes, axes=F, col = hcl.colors(n=10, palette = "Blue-Yellow", rev = TRUE), xlab = paste0("Probe ",probe))
+  mtext(text=lab, side=1, line=0.3, at=seq((0.5/wells),(1-(0.5/wells)),(1/wells)), las=2, cex=1)
+  output <- recordPlot()
+  
+}
+```
+
+```{r}
+# Function call for the BIO2090 "Among Us" event
+# Nicholas Harmer, 2022
+
+# Define function to provide a western blot clue; mark is the marker sizes; sus is a matrix of the suspects' protein sizes
+# probe is either "J" or "K".
+# The second and fifth markers will light up with probe J; the first and fourth markers will light up with probe K.
+# Only the largest suspect protein will light up (so no additional information is given about suspects).
+# The gel is giving separation in a range from 250 kDa to 3.2 kDa over a total of 100 pixels.
+# Gel equation used is log10(size in kDa) = 2.5 -(0.5*RBPB)
+# Band intensity reflects quantity (currently at two levels, could be increased).
+# A random amount of smiling is produced that will cause a change of up to 10% at the extremes.
+# Band loading is also dodgy in some places.
+# Returns a gel image.
+# Requires that the elliptic package has been called.
+
+West <- function(mark,wsus,probe="J"){
+  wells <- length(wsus[,1])+1
+  wes <- matrix(rep(0,(110000*wells)), nrow=wells*100)
+  smile <- sample(2:10,1)
+  for (i in 1:wells) {
+    wes[(30+((i-1)*100)):(80+((i-1)*100)),1020:1100] <- 1
+  }
+  if(probe == "J"){
+    markj <- c(mark[2],mark[5])
+    load <- round(rnorm(1,11,5)); if (load < 1){load <- 1}
+    width <- round(rnorm(1,80,10))
+    for (i in 1:2){
+      DBPB <- 1000-round(500*(2.5-(log10(markj[i])))) 
+      for (j in load:(load+width-1)){
+        DBPBi <- DBPB + round(DBPB*((smile*(1-cos(((100*wells/2)-j)/(100*wells/2)))/100)))
+        for (k in (DBPBi-8):(DBPBi+8)){
+           wes[j,k] <- limit(wes[j,k] + 0.015*(limit(8-(abs(k-DBPBi)),upper=6))*
+                            (limit((width/2)-(abs(load+(width/2)-j)),10)),1)
+        }
+      }
+    }  
+    
+    
+    DBPB <- 1000-round(500*(2.5-(log10(Prots[1]))))
+    for (i in 1:(wells-1)) {
+      if(substr(wsus[i,2],1,1) == "J") {
+        load <- round(rnorm(1,(11+(100*i)),5))
+        width <- round(rnorm(1,80,10)); if (load+width-1 > 100*wells){load <- (100*wells)-width}
+        for (j in load:(load+width-1)){
+          DBPBi <- DBPB + round(DBPB*((smile*(1-cos(((100*wells/2)-j)/(100*wells/2)))/100)))
+          for (k in (DBPBi-8):(DBPBi+8)){
+            wes[j,k] <- limit(wes[j,k] + 0.015*(limit(8-(abs(k-DBPBi)),upper=6))*
+                                (limit((width/2)-(abs(load+(width/2)-j)),10)),1)
+          }
+        }  
+      }
+    }
+  }
+
+  if(probe == "K"){
+    markk <- c(mark[1],mark[4])
+    load <- round(rnorm(1,11,5)); if (load < 1){load <- 1}
+    width <- round(rnorm(1,80,10))
+    for (i in 1:2){
+      DBPB <- 1000-round(500*(2.5-(log10(markk[i])))) 
+      for (j in load:(load+width-1)){
+        DBPBi <- DBPB + round(DBPB*((smile*(1-cos(((100*wells/2)-j)/(100*wells/2)))/100)))
+        for (k in (DBPBi-8):(DBPBi+8)){
+          wes[j,k] <- limit(wes[j,k] + 0.015*(limit(8-(abs(k-DBPBi)),upper=6))*
+                              (limit((width/2)-(abs(load+(width/2)-j)),10)),1)
+        }
+      }
+    }  
+    
+    DBPB <- 1000-round(500*(2.5-(log10(Prots[1]))))
+    for (i in 1:(wells-1)) {
+      if(substr(wsus[i,2],nchar(wsus[i,2]),nchar(wsus[i,2])) == "K") {
+        load <- round(rnorm(1,(11+(100*i)),5))
+        width <- round(rnorm(1,80,10)); if (load+width-1 > 100*wells){load <- (100*wells)-width}
+        for (j in load:(load+width-1)){
+          DBPBi <- DBPB + round(DBPB*((smile*(1-cos(((100*wells/2)-j)/(100*wells/2)))/100)))
+          for (k in (DBPBi-8):(DBPBi+8)){
+            wes[j,k] <- limit(wes[j,k] + 0.015*(limit(8-(abs(k-DBPBi)),upper=6))*
+                                (limit((width/2)-(abs(load+(width/2)-j)),10)),1)
+          }
+        }  
+      }
+    }
+  }
+  # Write out an image and return it as the output
+  lab <- rep("",wells) ; lab[1] <- "markers"
+  for (i in 2:(wells)) { lab[i] <- wsus[(i-1),1]}
+  image(wes, axes=F, col = hcl.colors(n=10, palette = "Blue-Yellow", rev = TRUE), xlab = paste0("Probe ",probe))
+  mtext(text=lab, side=1, line=0.3, at=seq((0.5/wells),(1-(0.5/wells)),(1/wells)), las=2, cex=1)
+  output <- recordPlot()
+  
+}
+```
+
+### HPLC
+This script gives a command for generating HPLC plots. The command takes five arguments, although likely only four will be provided. These are a matrix of suspect data (sprite numbers and chemical numbers), a data frame of HPLC data, a list of sprite names, a value for the phi (proportion of acetonitrile) and the time increment (smaller gives more detail in the image but takes longer; the default seems about right).
+The script then generates basic parameters for the run. These are:
+- number of samples (allows for addition of more compounds in the future).
+- column volume (t0), set within a small range to make different runs ever so slightly different.
+- total time for the experiment.
+- variable sets for retention time, width, and height for each compound. A loop is then set up to calculate these values based on the provided data frame (all data used here are from Fasoula  et al., DOI: 10.1021/acs.jchemed.7b00108).
+For ease of calculation, a "standard" result for each compound is calculated. A matrix is determined with a column for each compound and rows for each time increment up to the total time. From the retention time, width, and height calculated, the standard result for the compounds are calculated.
+A data frame is then set up for the results, with the absorbance linked to each suspect.
+The data are then calculated using a nested loop going through each suspect, timepoint, and compound. The "standard" result for each compound is added together at each timepoint. For clarity of reporting, the result for each suspect is offset by a set absorbance (about half the expected absorbance of each peak) and 0.1 minutes. This makes for a more attractive output. The first sample is given the highest absorbance offset so that the results are in the same order as the key.
+Finally, ggplot is used to display the data from the dataframe. The plot is returned from the command.
+
+```{r}
+# Function call for the BIO2090 "Among Us" event
+# Nicholas Harmer, 2021, 2022
+
+# Define function to provide an HPLC clue; HPLC is the data frame of data for the compounds.
+# phi is the percentage of acetonitrile; dt is the resolution in the x-axis; names is the list of suspect names.
+# The column model is from Fasoula, 2017. The first 15 min of the column is illustrated
+# column length could be altered if desired or included as an additional variable.
+# Requires that the "safe" color set has been set (e.g. from rcartocolor package)
+
+hplc <- function(sus,data,names="",phi=0.5,dt=0.01){
+  # Set up core parameters
+  sample <- length(data[,1])
+  t0 <- sample(9:12,1)/10; tmax <- 15; 
+  tR <- rep(0,sample); D <- rep(0,sample); h <- rep(0,sample)
+  # Set the retention time, width, and peak height for each sample
+  for (i in 1:sample){
+    tR[i] <- t0*(1+exp(data$c0[i]+(phi*data$c1[i])+(phi*phi*data$c2[i])))
+    D[i] <- data$D0[i]+(data$D1[i]*tR[i]); if (D[i] < 0.01) {D[i] <- 0.01} 
+    h[i] <- data$h0[i] + (data$h1[i]*tR[i])
+  }
+  # Set up a "standard" result matrix for each compound
+  AbsR <- matrix(rep(0,sample*(1+(tmax/dt))),nrow=sample)
+  for (i in 1:sample){
+    for (j in 1:(1+(tmax/dt))){
+      AbsR[i,j] <- 20*h[i]*exp(-((((j-1)*dt)-tR[i])^2)/D[i])/(phi^4)
+      if (AbsR[i,j] < 0) {AbsR[i,j] <- 0}
+    }
+  }
+  # Set up a data frame (results) for the results for each suspect. x = time (min), y = absorbance (set to zero)
+  result <- data.frame(x = rep(seq(0,tmax,by=dt),length(sus[,1])),
+                       y = c(0))
+  samples <- rep(" ",(1+(tmax/dt))*length(sus[,1]))
+  
+  # Calculate the y value for each timepoint for each suspect. Loop over suspects (i); timepoints (j); compounds (k)
+  for (i in 1:length(sus[,1])){
+    for (j in (round((1/dt),0)):(1+(tmax/dt))){
+      for (k in 2:length(sus[1,])){
+        result[j+((i-1)*(1+(tmax/dt))),2] <- result[j+((i-1)*(1+(tmax/dt))),2]+AbsR[sus[i,k],(j-((i-1)*(round((0.1/dt),0))))]
+      }
+      result[j+((i-1)*(1+(tmax/dt))),2] <- result[j+((i-1)*(1+(tmax/dt))),2]+(40*(length(sus[,1])-i))
+      samples[j+((i-1)*(1+(tmax/dt)))] = names[i]
+    }
+    # Correct sample to include the first 1/dt values.
+    for (j in 1:((round((1/dt),0))-1)) {
+      samples[j+((i-1)*(1+(tmax/dt)))] = names[i]
+    }
+  }
+  result$sample <- samples
+  
+  # Draw an image using ggplot
+  hp <- ggplot(data=result, aes(x = x, y = y))
+  hp <- hp + geom_line(mapping = aes(color = sample)) +
+    labs(y="Absorbance / mAU", x="time / min") + coord_cartesian(xlim = c(1.6, 15)) +
+    theme(axis.title = element_text(size = 20)) +
+    theme(axis.text = element_text(size = 15)) +
+    theme(legend.text = element_text(size = 20)) +
+    theme(legend.title = element_text(size = 20)) +
+    scale_colour_manual(values=safe)
+  output <- hp
+}
+```
+
+

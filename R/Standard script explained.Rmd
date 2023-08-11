@@ -1,0 +1,353 @@
+---
+title: '"Among us" style murder mystery setup explanation'
+author: "Nicholas Harmer"
+date: "2022-10-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Overview
+This script generates all the data and images required for a round of the "Among Us" style murder mystery. This script is appropriate for non-biochemists (e.g. forensic science students) as full understanding of the methods is not required. The difficulty is set to "standard" - 18 suspects and a moderate level of errors introduced. This should be challenging for students who have not tried this before. 
+Places where instructors might add changes are noted with the tag "Instructor change:".
+
+### Packages
+Four packages are required. tidyverse (https://www.tidyverse.org/) provides a range of tools for data handling and plotting. rcartocolor (https://carto.com/carto-colors/) provides a range of colour palettes, and here is used to provide an easy source of colour-blind friendly colours. elliptic (https://github.com/RobinHankin/elliptic.git) provides mathematical functions - here the "limit" function is required for the gel image modules. kableExtra (https://haozhu233.github.io/kableExtra/) provides tools for Rmarkdown and makes the assembly of the output file easier.
+These packages need to be installed once. The first time that the scripts are used, the user should remove the comment tag (#) from the line with the install.packages command and run this line.
+The warning messages can be ignored.
+Finally, the working directory is set to a desired folder for convenience.
+
+#### Instructor change:
+The first time that the scripts are used, the user should install the packages as described above.
+The working directory obviously needs to be changed by the user.
+```{r}
+# Load packages
+library(tidyverse)
+library(rcartocolor)
+library(elliptic)
+library(kableExtra)
+setwd("C:/Users/njh209/OneDrive - University of Exeter/Documents/R/Among Us")
+```
+
+### Defined commands
+Several modules are used repeatedly in the script. To reduce the length of the script, these are defined as commands in separate scripts that are placed into a folder labelled "code/Sub" under the desired main folder. The commands are defined in separate scripts to allow for individual replacement of these if necessary.
+
+```{r}
+# Source functions
+source("code/Sub/murder.R")
+source("code/Sub/suspects.R")
+source("code/Sub/Gel.R")
+source("code/Sub/Western.R")
+source("code/Sub/HPLC.R")
+```
+
+### Setting up core data
+The script requires some variables to be defined. These provide core data for the script. \
+Firstly, the sprites to be included in the script are defined and a series of variables are created for them to be filled in later.
+
+#### Instructor change:
+The number of sprites (suspects) can be altered by adding or removing names from the list. A further six names are suggested in the "hard" script. 
+```{r}
+Sprites <- data.frame(Names = c("Blackcurrant","Bubblegum","Burgundy","Cappuccino","Cocoa","Dalmation", "Lemon",
+                                "Lime","Nitrile","Ocean","Orange","Peach","Raspberry","Rose","Stone","Sunrise",
+                                "Tangerine","Violet"),
+                      chem1 = c(0),
+                      chem2 = c(0),
+                      chem3 = c(0),
+                      prot1 = c(1),
+                      prot2 = c(0),
+                      prot3 = c(0),
+                      glyco = c(0))
+```
+Variables are set to explain the "protein glycosylation" outlined in the class instruction document. This sets the options and patterns for western blots and mass spectrometry.
+```{r}
+Glyco <- c("O", "J", "JK", "JL", "K", "JLK")
+lectins <- matrix(c(0,0,1,0,1,1,1,0,0,1,1,1),nrow=2)
+MS <- c(1,2,3,3,2,4)
+PepMass <- 836; hexmass <- 162.1
+```
+Protein and marker sizes for the SDS-PAGE and western blot simulation are loaded into variables.
+
+#### Instructor change:
+The sizes of the markers can be changed as required: we chose these sizes to fit with the sample used in our practical class. The sizes of the Sprite proteins can also be altered but the number should be kept to five for consistency with the rest of the script.
+```{r}
+Prots <- c(75,55,40,30,25)
+Markers <- c(210, 105,78,55,45,34,17,16,7,4)
+```
+Parameters are set for the HPLC (all data derived from Fasoula  et al., DOI: 10.1021/acs.jchemed.7b00108, except for LogP taken from Pubchem. LogP is not used further in the script but is retained for possible future development).
+
+#### Instructor change:
+Alternative compounds could be included here if the instructor has suitable data. The number of compounds should be kept to five or more significant changes will be required in the script.
+```{r}
+HPLC <- data.frame(chems = c("Benzene", "3-BP", "2,4-DBP", "2,4,6-TBP", "2B-4NP"),
+                   logP = c(2.1,2.6,3.2,4.4,2.4),
+                   D0 = c(-0.0677,-0.0803,-0.0161,-0.0138,-0.1565),
+                   D1 = c(0.0216,0.0312,0.0113,0.0079,0.0589),
+                   c0 = c(4.57,4.734,6.722,7.931,4.6),
+                   c1 = c(-9.331,-11.58,-15.89,-17.53,-12.46),
+                   c2 = c(3.602,5.33,8.399,9.416,6.315),
+                   h0 = c(0.0962,0.2041,0.1420,0.2658,0.3055),
+                   h1 = c(-0.0112, -0.0358, -0.0141,-0.0171,-0.0707))
+```
+The final parameters are to set up a variable for the "victims"; to define the number of clues to be given for each experiment each round (one of which is always the impostor; usually about half the total number of suspects); to define the error rate (as a percentage, with only whole numbers being meaningful); and to set up a colour blind friendly colour palette. 
+
+#### Instructor change:
+The "cluesize" and "Error" variables are key elements of the difficulty of the problem. Cluesize indicates how many sprites will be included in each piece of data; the larger this is, the easier the problem will be. Cluesize should not exceed the number of sprites less three (or there will not be sufficient sprites to choose from in round 3).
+Error indicates the percentage chance that any individual result will have been tampered with. The greater the error rate, the more challenging the problem. A 10% error would reflect a hard problem.
+```{r}
+victims <- c(0,0,0)
+cluesize <- 9 # The final clue is always the impostor sample so this needs to be greater than 1!
+Error <- 6 # Chance that the impostor will have tampered with a sample; range 0-100, whole numbers only.
+safe = carto_pal(12,"Safe") # Set up a colourblind friendly colour palette
+```
+
+#### Instructor change:
+Code below this line is unlikely to be useful to change in general, and would be for experts only.
+
+### Randomly assign features to the sprites
+A loop is used to randomly assign to sprites the three chemicals that they produce, the two variant cuticle proteins, and a "glycosylation" group. The chemicals are randonly assigned to an integer between 1 and 5; a loop is used to ensure that all three chemicals are unique for each sprite. The first cuticle protein is always assigned as protein 1 (above), whilst the other two are randomly assigned to an integer between 2 and 5. These can be identical as explained in the class schedule. Finally, the glycosylatoin group is randomly assigned to an integer between 1 and 6.
+```{r}
+# Assign features to Sprites; features are name(1); three chemicals (2-4); three proteins (5-7); one glyco group(8).
+for (i in 1:length(Sprites$Names)) {
+  Sprites[i,2] <- sample(1:5,1)
+  unique <- FALSE
+  while (unique == FALSE) {
+    Sprites[i,3] <- sample(1:5,1)
+    Sprites[i,4] <- sample(1:5,1)
+    if ((Sprites[i,4] != Sprites[i,2]) && (Sprites[i,4] != Sprites[i,3]) && (Sprites[i,2] != Sprites[i,3])) {unique <- TRUE}
+  }
+  Sprites[i,6] <- sample(2:5,1); Sprites[i,7] <- sample(2:5,1); Sprites[i,8] <- sample(1:6,1)
+}
+```
+
+### Assign the imposter
+The imposter is randomly assigned between the available sprites. Only the number of the sprite is selected as this facilitates the rest of the code.
+```{r}
+# Generate an impostor
+Impostor <- sample(1:length(Sprites$Names),1)
+```
+
+## Round 1
+A full description of the code is given for the first round of the study. The subsequent rounds repeat this code with minor alterations. This could likely be made more efficient with a loop and/or extending the functions.
+
+### Carry out the first murder
+The murder victim is selected using the "murder" command (see the "murder" subroutine file). This requires arguments of the total number of sprites (integer), the list of victims (to ensure that the same sprite is not killed twice! Currently this is a set of zeroes), and the sprite number of the impostor (so that they do not kill themselves, although that might be a possible extension to include in the final round, if the impostor feared that the net was closing in on them).
+```{r}
+# Carry out the first murder
+victims[1] <- murder(length(Sprites$Names),victims,Impostor)
+```
+
+### Obtain a gel clue
+The order of collecting clues does not matter as the instructor can provide them to students in any order. It makes sense to provide the western and MS clues together as they report on the same phenomenon.
+To obtain a gel clue, the "susp" command (from the "suspects" subroutine) is used to generate a random list of suspects. This takes arguments of the number of suspects (integer; the "cluesize" value less one is used as the last piece of data will be from the unknown impostor); the total number of sprites to select from (integer); and the list of known victims, as they will not be selected as suspects obviously. This returns a list of suspects. The impostor number is added to the list as an unknown.
+The "gelsus" matrix is set up as four columns of data. A loop adds to this sprite number of each suspect; and the size of the three proteins to be used (in kDa). The first of these is always the largest protein so this is taken directly rather than obtained from the Sprites data frame. Each of the other two proteins can be randomly re-assigned in this matrix to a different value, with the probability set by the "Error" variable.
+An output image file is set, to be directed to an "output" folder in the file structure. This needs to exist in the user's file structure!
+The "gel" command (from the "Gel" subroutine) is called. This requires arguments of the list of marker sizes (Markers), the matrix of information on the suspects and their proteins (gelsus), and the names of the sprites. The final command prints the image to the file selected.  
+```{r}
+# Obtain a gel clue. Includes the impostor sample. Defined probability that samples are mixed up.
+
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor  
+gelsus <- matrix(rep(0,cluesize*4), nrow=cluesize)
+for (i in 1:cluesize) {
+  gelsus[i,1] <- susp[i] ; gelsus[i,2] <- Prots[1]; gelsus[i,3] <- Prots[Sprites$prot2[susp[i]]]
+  gelsus[i,4] <- Prots[Sprites$prot3[susp[i]]]
+  if(sample(0:99,1)<Error){gelsus[i,3] <- Prots[sample(1:5,1)]}
+  if(sample(0:99,1)<Error){gelsus[i,4] <- Prots[sample(1:5,1)]}
+}
+png(filename="output/Gel1.png")
+gel <- Gel(Markers, gelsus, names=Sprites$Names)
+dev.off()
+```
+
+### Obtain a western blot clue
+The western blot clue works very similarly to the gel. A list of suspects is assembled as above; information is placed in a matrix (here with just the name and the "glycosylation" group); the group can be randomised according to the error percentage. Either the "J" or "K" lectin is selected at random (this will be switched each round). An output image file is set, and the "west" command (defined in the "Western" subroutine) is called, with arguments of the marker size list, the matrix of data, and the selected probe. The image produced is then printed.
+```{r}
+# Obtain a western clue. Includes the impostor sample. Defined probability that samples are mixed up.
+  
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor  
+wessus <- matrix(rep(0,cluesize*2), nrow=cluesize)
+for (i in 1:cluesize) {
+  wessus[i,1] <- Sprites$Names[susp[i]] ; wessus[i,2] <- Glyco[Sprites$glyco[susp[i]]]
+  if(sample(0:99,1)<Error){wessus[i,2] <- Glyco[sample(1:6,1)]}
+}
+if(sample(1:2,1) == 1){probe <- "J"} else {probe <- "K"}
+png(filename="output/West1.png")
+west <- West(Markers,wessus,probe)
+dev.off()  
+```
+
+### Obtain a mass spectrometry clue
+The mass spectrometry clue is determined in a similar manner to the other clues. In this case, the output will be a table rather than an image and does not require a subroutine. A possible extension would be to generate mass spectra, but this would be very challenging for students to interpret under time pressure. This might be considered for student study without time pressure.
+The list of suspects is determined as above. A matrix is defined, and given column names for presentation later. The masses are determined by adding the peptide mass to a sugar mass that differs for each "glycosylation group". Some groups have the same mass to add to the challenge. The value obtained can be randomised with the defined error percentage.
+Finally, the data are written to a specific data frame for round 1 for later reporting.
+```{r}
+# Obtain a mass spectrometry clue. Includes the impostor sample. Defined probability that samples are mixed up.
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor  
+mssus <- matrix(rep(0,cluesize*2), nrow=cluesize); colnames(mssus) <- c("Sprite","m/z")
+for (i in 1:cluesize) {
+  mssus[i,1] <- Sprites$Names[susp[i]] ; mssus[i,2] <- PepMass + (hexmass * MS[Sprites$glyco[susp[i]]])
+  if(sample(0:99,1)<Error){mssus[i,2] <- PepMass + (hexmass * MS[sample(1:6,1)])}
+}
+mssus[cluesize,1] <- "Impostor"
+mssus1 <- as.data.frame(mssus)
+```
+
+### Obtain an HPLC clue
+The HPLC clue is set up similarly to previous data sets.
+The list of suspects is prepared as above. A matrix is set up to take the sprite number and the chemical numbers.
+A list of names is set up for the legend to the graph produced.
+A loop adds the data to the matrix (sprite number and the numbers of the three chemicals assigned to each sprite; each of these numbers can be randomly assigned to a different value); and adds the sprite name to the list for the legend.
+The final name is set to "X: Impostor". The X is required as the plot legend is presented in alphabetical order. With this X, the imposter will always be at the bottom ("susp" returns the suspects in alphabetical order). This makes reading the HPLC far easier, especially under time pressure. 
+"phi" is the proportion of acetonitrile (1 = 100%) in the column to be used. The column definition in this case makes most sense to use between 0.4 and 0.6; less will result in few samples being read in the run time used, whilst more will cause most of the samples to co-elute.
+The "hplc" command is called (from the "HPLC" subroutine). This has arguments of the matrix of data; the data frame of HPLC data for the chemicals; the list of names for the figure legend; and the selected phi. The output is set as a variable that will be called in the output document.
+```{r}
+# Obtain an HPLC clue. Includes the impostor sample. Defined probability that samples are mixed up.
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor  
+hpsus <- matrix(rep(0,cluesize*4), nrow=cluesize)
+names <- rep(" ", cluesize)
+for (i in 1:cluesize) {
+  hpsus[i,1] <- susp[i] ; hpsus[i,2] <- Sprites$chem1[susp[i]]; hpsus[i,3] <- Sprites$chem2[susp[i]]
+  hpsus[i,4] <- Sprites$chem3[susp[i]]
+  if(sample(0:99,1)<Error){hpsus[i,2] <- sample(1:5,1)}
+  if(sample(0:99,1)<Error){hpsus[i,3] <- sample(1:5,1)}
+  if(sample(0:99,1)<Error){hpsus[i,4] <- sample(1:5,1)}
+  names[i] <- Sprites$Names[susp[i]]; 
+}
+names[cluesize] <- "X: Impostor"
+phi1 <- 0.4 + (sample(0:4,1)*0.05)
+hp1 <- hplc(hpsus,HPLC,names,phi1)
+```
+
+## Round 2
+The code for round 2 is very similar to round 1. The only changes are that the data saved for reporting are sent to new variables; and the probe for the western blot is switched.
+```{r}
+# Carry out the second murder
+
+victims[2] <- murder(length(Sprites$Names),victims,Impostor)
+
+# Obtain a gel clue. Includes the impostor sample. Defined probability that samples are mixed up.
+
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor  
+gelsus <- matrix(rep(0,cluesize*4), nrow=cluesize)
+for (i in 1:cluesize) {
+  gelsus[i,1] <- susp[i] ; gelsus[i,2] <- Prots[1]; gelsus[i,3] <- Prots[Sprites$prot2[susp[i]]]
+  gelsus[i,4] <- Prots[Sprites$prot3[susp[i]]]
+  if(sample(0:99,1)<Error){gelsus[i,3] <- Prots[sample(1:5,1)]}
+  if(sample(0:99,1)<Error){gelsus[i,4] <- Prots[sample(1:5,1)]}
+}
+png(filename="output/Gel2.png")
+gel <- Gel(Markers, gelsus, names=Sprites$Names)
+dev.off()  
+
+# Obtain a western clue. Includes the impostor sample. Defined probability that samples are mixed up.
+
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor  
+wessus <- matrix(rep(0,cluesize*2), nrow=cluesize)
+for (i in 1:cluesize) {
+  wessus[i,1] <- Sprites$Names[susp[i]] ; wessus[i,2] <- Glyco[Sprites$glyco[susp[i]]]
+  if(sample(0:99,1)<Error){wessus[i,2] <- Glyco[sample(1:6,1)]}
+}
+if(probe == "K"){probe <- "J"} else {probe <- "K"}
+png(filename="output/West2.png")
+west <- West(Markers,wessus,probe)
+dev.off()  
+
+# Obtain a mass spectrometry clue. Includes the impostor sample. Defined probability that samples are mixed up.
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor  
+mssus <- matrix(rep(0,cluesize*2), nrow=cluesize); colnames(mssus) <- c("Sprite","m/z")
+for (i in 1:cluesize) {
+  mssus[i,1] <- Sprites$Names[susp[i]] ; mssus[i,2] <- PepMass + (hexmass * MS[Sprites$glyco[susp[i]]])
+  if(sample(0:99,1)<Error){mssus[i,2] <- PepMass + (hexmass * MS[sample(1:6,1)])}
+}
+mssus[cluesize,1] <- "Impostor"
+mssus2 <- as.data.frame(mssus)
+
+
+# Obtain an HPLC clue. Includes the impostor sample. Defined probability that samples are mixed up.
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor  
+hpsus <- matrix(rep(0,cluesize*4), nrow=cluesize)
+names <- rep(" ", cluesize)
+for (i in 1:cluesize) {
+  hpsus[i,1] <- susp[i] ; hpsus[i,2] <- Sprites$chem1[susp[i]]; hpsus[i,3] <- Sprites$chem2[susp[i]]
+  hpsus[i,4] <- Sprites$chem3[susp[i]]
+  if(sample(0:99,1)<Error){hpsus[i,2] <- sample(1:5,1)}
+  if(sample(0:99,1)<Error){hpsus[i,3] <- sample(1:5,1)}
+  if(sample(0:99,1)<Error){hpsus[i,4] <- sample(1:5,1)}
+  names[i] <- Sprites$Names[susp[i]]; 
+}
+names[cluesize] <- "X: impostor"
+phi2 <- 0.4 + (sample(0:4,1)*0.05)
+hp2 <- hplc(hpsus,HPLC,names,phi2)
+```
+## Round 3
+The code for round 3 is identical to round 2, with the data saved for reporting are sent to new variables.
+```{r}
+# Carry out the third murder
+
+victims[3] <- murder(length(Sprites$Names),victims,Impostor)
+
+# Obtain a gel clue. Includes the impostor sample. Defined probability that samples are mixed up.
+
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor  
+gelsus <- matrix(rep(0,cluesize*4), nrow=cluesize)
+for (i in 1:cluesize) {
+  gelsus[i,1] <- susp[i] ; gelsus[i,2] <- Prots[1]; gelsus[i,3] <- Prots[Sprites$prot2[susp[i]]]
+  gelsus[i,4] <- Prots[Sprites$prot3[susp[i]]]
+  if(sample(0:99,1)<Error){gelsus[i,3] <- Prots[sample(1:5,1)]}
+  if(sample(0:99,1)<Error){gelsus[i,4] <- Prots[sample(1:5,1)]}
+}
+png(filename="output/Gel3.png")
+gel3 <- Gel(Markers, gelsus, names=Sprites$Names)
+dev.off()  
+
+# Obtain a western clue. Includes the impostor sample. Defined probability that samples are mixed up.
+
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor  
+wessus <- matrix(rep(0,cluesize*2), nrow=cluesize)
+for (i in 1:cluesize) {
+  wessus[i,1] <- Sprites$Names[susp[i]] ; wessus[i,2] <- Glyco[Sprites$glyco[susp[i]]]
+  if(sample(0:99,1)<Error){wessus[i,2] <- Glyco[sample(1:6,1)]}
+}
+if(probe == "K"){probe <- "J"} else {probe <- "K"}
+png(filename="output/West3.png")
+west <- West(Markers,wessus,probe)
+dev.off()  
+
+# Obtain a mass spectrometry clue. Includes the impostor sample. Defined probability that samples are mixed up.
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor 
+mssus <- matrix(rep(0,cluesize*2), nrow=cluesize); colnames(mssus) <- c("Sprite","m/z")
+for (i in 1:cluesize) {
+  mssus[i,1] <- Sprites$Names[susp[i]] ; mssus[i,2] <- PepMass + (hexmass * MS[Sprites$glyco[susp[i]]])
+  if(sample(0:99,1)<Error){mssus[i,2] <- PepMass + (hexmass * MS[sample(1:6,1)])}
+}
+mssus[cluesize,1] <- "Impostor"
+mssus3 <- as.data.frame(mssus)
+
+
+# Obtain an HPLC clue. Includes the impostor sample. Defined probability that samples are mixed up.
+susp <- suspects((cluesize-1),length(Sprites$Names),victims); susp[cluesize] <- Impostor  
+hpsus <- matrix(rep(0,cluesize*4), nrow=cluesize)
+names <- rep(" ", cluesize)
+for (i in 1:cluesize) {
+  hpsus[i,1] <- susp[i] ; hpsus[i,2] <- Sprites$chem1[susp[i]]; hpsus[i,3] <- Sprites$chem2[susp[i]]
+  hpsus[i,4] <- Sprites$chem3[susp[i]]
+  if(sample(0:99,1)<Error){hpsus[i,2] <- sample(1:5,1)}
+  if(sample(0:99,1)<Error){hpsus[i,3] <- sample(1:5,1)}
+  if(sample(0:99,1)<Error){hpsus[i,4] <- sample(1:5,1)}
+  names[i] <- Sprites$Names[susp[i]]; 
+}
+names[cluesize] <- "X: impostor"
+phi3 <- 0.4 + (sample(0:4,1)*0.05)
+hp3 <- hplc(hpsus,HPLC,names,phi3)
+```
+
+## Produce the output document
+The output is prepared using an Rmarkdown document. This is available as part of the Git repository. The markdown document obtains the data that has been stored by the script and assembles this into an html file. This file can be also prepared in other formats (e.g. Word or pdf) according to the user's preference by altering the header of the Rmarkdown document.
+The final line in this chunk is uncommented in the full script.
+```{r}
+# Generate output file
+
+# rmarkdown::render("code/Output standard.rmd", output_dir = "output")
+```
+## End
