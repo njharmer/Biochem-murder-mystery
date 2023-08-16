@@ -2,7 +2,10 @@
 # Nicholas Harmer, 2021-2023
 
 # Install packages if necessary
-# To run this script, it is first necessary to install the following four packages:
+# This script should be run in the RStudio IDE. If using a different interface, it may be necessary
+# to install a recent version of the pandoc package. This is not supported in standard repositories
+# so may be challenging.
+# To run this script in RStudio, it is first necessary to install the following four packages:
 # tidyverse, rcartocolor, elliptic, kableExtra
 # These have dependencies that will be automatically installed.
 # On the first use of these scripts, uncomment the following line to install the necessary packages.
